@@ -1314,22 +1314,18 @@
     return dateLabel + " " + pad2(d.getHours()) + ":" + pad2(d.getMinutes());
   }
 
-  function renderEntries(nickFilter, dateFilter) {
-    var list = ENTRIES.slice();
+  function renderList(list, nickFilter, hasDateFilter) {
     if (nickFilter) {
       list = list.filter(function (e) { return e.nickname === nickFilter; });
-    }
-    if (dateFilter) {
-      list = list.filter(function (e) { return dateKey(e.ts) === dateFilter; });
     }
     if (list.length === 0) {
       boardList.innerHTML = "";
       boardEmpty.hidden = false;
-      if (nickFilter && dateFilter) {
+      if (nickFilter && hasDateFilter) {
         boardEmpty.textContent = "'" + nickFilter + "'님이 그 날짜에 남긴 기록이 없어요.";
       } else if (nickFilter) {
         boardEmpty.textContent = "'" + nickFilter + "'님의 기록이 아직 없어요.";
-      } else if (dateFilter) {
+      } else if (hasDateFilter) {
         boardEmpty.textContent = "그 날짜에 남겨진 기록이 없어요.";
       } else {
         boardEmpty.textContent = "아직 남겨진 기록이 없어요. 첫 기록을 남겨보세요.";
@@ -1357,10 +1353,51 @@
     return { nick: filterInput.value.trim(), date: dateFilterInput.value || "" };
   }
 
+  function startOfDayTs(dateStr) {
+    var parts = dateStr.split("-");
+    return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]), 0, 0, 0, 0).getTime();
+  }
+  function endOfDayTs(dateStr) {
+    return startOfDayTs(dateStr) + 24 * 60 * 60 * 1000;
+  }
+
+  var dateQueryToken = 0;
+
   function refreshList() {
     var f = currentFilters();
-    renderEntries(f.nick, f.date);
     filterClear.hidden = !(f.nick || f.date);
+
+    if (!f.date) {
+      renderList(ENTRIES.slice(), f.nick, false);
+      return;
+    }
+
+    // 날짜가 지정되면, 화면에 올라와 있는 최근 목록과 상관없이
+    // 그 날짜의 기록을 저장소에서 직접 찾아온다 (1년 전이든 언제든 동일하게 동작).
+    if (!db) {
+      renderList(ENTRIES.filter(function (e) { return dateKey(e.ts) === f.date; }), f.nick, true);
+      return;
+    }
+
+    var myToken = ++dateQueryToken;
+    boardStatus.textContent = "그 날짜의 기록을 찾는 중...";
+    db.collection(FIREBASE_COLLECTION)
+      .where("ts", ">=", startOfDayTs(f.date))
+      .where("ts", "<", endOfDayTs(f.date))
+      .orderBy("ts", "desc")
+      .get()
+      .then(function (snapshot) {
+        if (myToken !== dateQueryToken) return;
+        boardStatus.textContent = "친구들과 실시간으로 연결됐어요.";
+        renderList(snapshot.docs.map(function (doc) { return doc.data(); }), f.nick, true);
+      })
+      .catch(function () {
+        if (myToken !== dateQueryToken) return;
+        boardStatus.textContent = "친구들과 실시간으로 연결됐어요.";
+        boardList.innerHTML = "";
+        boardEmpty.hidden = false;
+        boardEmpty.textContent = "그 날짜의 기록을 불러오지 못했어요.";
+      });
   }
 
   try {
@@ -1381,10 +1418,10 @@
 
   if (!configFilled) {
     boardStatus.textContent = "게시판을 켜려면 Firebase 연결이 필요해요 (설정 대기 중).";
-    renderEntries("", "");
+    renderList([], "", false);
   } else if (!window.firebase) {
     boardStatus.textContent = "게시판 연결에 실패했어요. (네트워크를 확인해주세요)";
-    renderEntries("", "");
+    renderList([], "", false);
   } else {
     try {
       firebase.initializeApp(FIREBASE_CONFIG);
@@ -1393,11 +1430,11 @@
 
       db.collection(FIREBASE_COLLECTION)
         .orderBy("ts", "desc")
-        .limit(300)
+        .limit(500)
         .onSnapshot(function (snapshot) {
           ENTRIES = snapshot.docs.map(function (doc) { return doc.data(); });
           boardStatus.textContent = "친구들과 실시간으로 연결됐어요.";
-          refreshList();
+          if (!dateFilterInput.value) refreshList();
         }, function (err) {
           boardStatus.textContent = "기록을 불러오지 못했어요. (" + ((err && err.code) || "오류") + ")";
         });
