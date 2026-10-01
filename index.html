@@ -412,6 +412,10 @@
     color: var(--text);
     font-family: inherit;
     font-size: 14px;
+    color-scheme: light only;
+  }
+  input[type="date"].board-input {
+    width: 100%;
   }
   select.board-input {
     cursor: pointer;
@@ -624,31 +628,36 @@
   }
 
   @media (max-width: 640px) {
-    .emotion-grid { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .emotion-grid { grid-template-columns: repeat(3, 1fr); gap: 8px; }
     .emotion-btn {
-      flex-direction: column;
-      justify-content: center;
+      flex-direction: row;
+      justify-content: flex-start;
       align-items: center;
-      text-align: center;
+      text-align: left;
       gap: 8px;
-      padding: 14px 6px;
-      min-height: 104px;
+      padding: 8px 8px;
+      min-height: 60px;
     }
-    .emotion-icon { width: 40px; height: 40px; }
-    .emotion-icon svg { width: 22px; height: 22px; }
-    .emotion-label { font-size: 13.5px; line-height: 1.3; }
+    .emotion-icon { width: 32px; height: 32px; }
+    .emotion-icon svg { width: 17px; height: 17px; }
+    .emotion-label { font-size: 12px; line-height: 1.25; }
+    .quote-card { min-height: auto; padding: 22px 18px; gap: 12px; }
+    .quote-text { font-size: 18px; line-height: 1.55; }
+    .reroll-btn { padding: 9px 20px; min-height: 38px; font-size: 13px; margin-top: 0; }
     .rec-grid { grid-template-columns: 1fr; }
     .rec-card { flex-direction: row; text-align: left; padding: 12px 14px; }
     .board-row { flex-direction: column; }
+    .board-row .board-date-input { flex-basis: auto; }
     .board-submit { padding: 12px; }
   }
 
   @media (max-width: 340px) {
-    .emotion-grid { gap: 7px; }
-    .emotion-btn { padding: 12px 4px; min-height: 96px; }
-    .emotion-icon { width: 36px; height: 36px; }
-    .emotion-icon svg { width: 20px; height: 20px; }
-    .emotion-label { font-size: 12.5px; }
+    .emotion-grid { gap: 6px; }
+    .emotion-btn { padding: 7px 6px; min-height: 54px; gap: 6px; }
+    .emotion-icon { width: 28px; height: 28px; }
+    .emotion-icon svg { width: 15px; height: 15px; }
+    .emotion-label { font-size: 11px; }
+    .quote-text { font-size: 16px; }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -861,7 +870,7 @@
         </div>
         <textarea id="noteInput" class="board-textarea" placeholder="지금 느낀 감정에 대해 짧게 남겨보세요 (선택)" maxlength="60" rows="2"></textarea>
         <div class="board-row">
-          <input type="date" id="entryDateInput" class="board-input board-date-input" aria-label="③ 기록할 날짜">
+          <input type="date" id="entryDateInput" class="board-input" aria-label="③ 기록할 날짜">
         </div>
         <button type="button" class="board-submit board-submit-wide" id="boardSubmit">④ 기록 남기기</button>
         <p class="board-msg" id="boardMsg" aria-live="polite"></p>
@@ -1335,15 +1344,15 @@
     boardEmpty.hidden = true;
     boardList.innerHTML = list.map(function (e) {
       var label = LABELS[e.emotion] || e.emotion;
-      var noteHtml = e.note ? '<p class="board-item-note">' + escapeHtml(e.note) + "</p>" : "";
+      var noteText = (e.note || "").trim();
+      var contentText = (noteText && noteText !== label) ? (label + " · " + noteText) : label;
       return (
         '<li class="board-item" style="--item-accent: var(--' + e.emotion + ', var(--text-faint))">' +
           '<div class="board-item-top">' +
             '<span class="board-item-who"><span class="board-item-dot"></span>' + escapeHtml(e.nickname) + "</span>" +
             '<span class="board-item-time">' + formatWhen(e.ts) + "</span>" +
           "</div>" +
-          '<span class="board-item-emotion">' + escapeHtml(label) + "</span>" +
-          noteHtml +
+          '<p class="board-item-note">' + escapeHtml(contentText) + "</p>" +
         "</li>"
       );
     }).join("");
